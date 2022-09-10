@@ -3,10 +3,12 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.decorators import task, dag
 from airflow.utils.task_group import TaskGroup
+import inspect
+
 
 from datetime import datetime, timedelta
 from typing import Dict
-from subdag.subdag_factory import subdag_factory
+# from subdag.subdag_factory import subdag_factory
 
 default_args = {
     "start_date": datetime(2021, 1, 1)
@@ -27,27 +29,41 @@ def dag_306_taskflow():
     def extract():
         return {"partner_name":"neftlix", "partner_path":"/path/netflix"}
 
+    @task.python
+    def process_a(partner_name, partner_path):
+        print(f"Starting process {inspect.currentframe().f_code.co_name}")
+        print(partner_name)
+        print(partner_path)
+
+    @task.python
+    def process_b(partner_name, partner_path):
+        print(f"Starting process {inspect.currentframe().f_code.co_name}")
+        print(partner_name)
+        print(partner_path)
+
+    @task.python
+    def process_c(partner_name, partner_path):
+        print(f"Starting process {inspect.currentframe().f_code.co_name}")
+        print(partner_name)
+        print(partner_path)
+
+    @task.python
+    def check_tasks():
+        print("checking")
+
     partner_settings = extract()
 
     with TaskGroup(group_id="process_tasks") as process_tasks:
-        @task.python
-        def process_a(partner_name, partner_path):
-            print(partner_name)
-            print(partner_path)
 
-        @task.python
-        def process_b(partner_name, partner_path):
-            print(partner_name)
-            print(partner_path)
+        with TaskGroup(group_id="test_tasks") as test_tasks:
+            check_tasks()
 
-        @task.python
-        def process_c(partner_name, partner_path):
-            print(partner_name)
-            print(partner_path)
 
-        process_a(partner_settings['partner_name'], partner_settings['partner_path'])
-        process_b(partner_settings['partner_name'], partner_settings['partner_path'])
-        process_c(partner_settings['partner_name'], partner_settings['partner_path'])
+        process_a(partner_settings['partner_name'], partner_settings['partner_path']) >> test_tasks
+        process_b(partner_settings['partner_name'], partner_settings['partner_path']) >> test_tasks
+        process_c(partner_settings['partner_name'], partner_settings['partner_path']) >> test_tasks
+
+
 
 
 dag = dag_306_taskflow()
