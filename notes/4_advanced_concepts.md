@@ -136,7 +136,7 @@ At Task level
 
 
 ## Timeouts
-- can be defined at the DAG level with - dagrun_timeout
+- can be defined at the DAG level with - dagrun_timeout (defined on dag definition)
 - always recomanded to avoid having too many dags running indefinitely
 - works only for scheduled dags - for manually triggederd dags will not be used
 - at the Operator level you can use execution_level
@@ -160,6 +160,8 @@ At Task level
             - AirflowSensorTimeout
             - ...
     - context['ti'].try_number() - will give you the retry number
+        - if(context['ti'].try_number() > 2):
+            buisiness logic...
 
 ## Different ways to retry
 - `default_task_retries` (config) - overriden by `retries` at DAG - overriden by `retries` Task level
