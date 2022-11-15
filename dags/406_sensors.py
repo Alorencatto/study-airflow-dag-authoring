@@ -64,6 +64,7 @@ def process_tasks(partner_settings):
         dagrun_timeout=timedelta(minutes=10),
         tags=['data_science', 'customer'],
         catchup=False, max_active_runs=1)
+
 def dag_404_task_priority():
 
     start = DummyOperator(task_id="start")

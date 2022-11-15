@@ -21,9 +21,12 @@ default_args = {
 }
 
 def _choosing_pertner_based_on_day(execution_date):
+    """
+    Always return task id
+    """
     day = execution_date.day_of_week
     print(day)
-    if (day == 1):
+    if (day == 0):
         return 'extract_partner_snowflake'
     if (day == 3):
         return 'extract_partner_netflix'

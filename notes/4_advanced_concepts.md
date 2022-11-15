@@ -101,10 +101,12 @@ At Task level
 - for the first run, depends_on_past is ignored
 - for backfills it is also ignored
 - the tasks are triggered iven if the past task was skipped
+- Interessante utilizar quando deseja que o processo pare assim que houver falha.
+- A tarefa vai ser excutada se a última tiver com status de `success` ou `skipped`
 
 **Wait for downstream** - commonly used with depends on past
 - (1)  [A] -> [B] -> [C]
-- (2)  [A] -> [B] -> [C]
+- (2)  [A] -> [B] -> [C ]
 
 - if wait for downstream is True
     - (2)[A] will run only if (1)[A] and (1)[B] succeded - only waiting for the direct downstream
@@ -117,16 +119,21 @@ At Task level
 - eg. FileSensor, DateTimeSensor, SqlSensor
 - for DateTimeSensor meaningfull arguments
     - target_time - timedalta, can be templated
-    - poke_interval - the time it will retry
+    - poke_interval - the time it will retry. Time that airflow will check if condition is true.
     - mode
         - poke every poke_interval - will block a worker slot
-        - reschedule - will not block a worker set
+        - reschedule - will not block a worker set. Clean worker slot (BEST PRATICE FOR MANAGING RESOURCES)
     - timeout = 7days - this default value can ba bad - available for Sensors
+        - Time the sensor waits for a true condition, otherwise it results in a timeout
         - you should define a better suited timeout
         - used with soft_fail=True - will skip the task on timeout
+        - soft_fail=True -> Instead of failing, it results in skip
+        - != execution_timeout (timeout for operator)
     - execution_timeout - this doesn't have a default value - available for all Operators
     - exponential_backoff=True - will increase exponentially the waiting period
+        - Works in http sensor, for example
 - ! always define a timeout
+
 
 ## Timeouts
 - can be defined at the DAG level with - dagrun_timeout
@@ -136,7 +143,7 @@ At Task level
     - doesn't have a value by default
     - also should always define a timeout
 
-## Mange failures
+## Manage failures
 - at the DAG level
     - on_success_callback(context)
     - on_failure_callback

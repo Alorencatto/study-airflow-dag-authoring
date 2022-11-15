@@ -24,7 +24,9 @@ def dag_403_dependencies():
     t5 = DummyOperator(task_id="t5")
     t6 = DummyOperator(task_id="t6")
     
-
+    # t4 depends on t1,t2,t3
+    # t5 depends on t1,t2,t3
+    # t6 depends on t1,t2,t3
     cross_downstream([t1, t2, t3], [t4, t5, t6])
 
 
@@ -35,6 +37,8 @@ def dag_403_dependencies():
     x5 = DummyOperator(task_id="x5")
     x6 = DummyOperator(task_id="x6")
 
+    # Chaining dependencies
+    # Lists with same size
     chain(x1, [x2,x3], [x4,x5], x6)
 
     y1 = DummyOperator(task_id="y1")
@@ -44,6 +48,8 @@ def dag_403_dependencies():
     y5 = DummyOperator(task_id="y5")
     y6 = DummyOperator(task_id="y6")
 
+    # y4 depends on y2,y3
+    # y5 depends on y2,y3
     cross_downstream([y2,y3], [y4,y5])
     chain(y1, y2, y5, y6)
 
