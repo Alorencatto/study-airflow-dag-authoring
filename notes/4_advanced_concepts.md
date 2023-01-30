@@ -171,6 +171,7 @@ At Task level
 - `max_retry_delay` timedelta - limit the exponential_backoff
 
 ## SLA
+- SLA is to verify thar your task gets completed in a given period of time
 - receive a notification when a task takes too much, but less than the timeout
 - at the Task level
     - `sla` timedelta
