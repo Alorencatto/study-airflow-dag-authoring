@@ -7,8 +7,8 @@ from airflow.decorators import task, dag
 from datetime import datetime, timedelta
 
 @dag(description="Scheduling",
-        start_date=datetime(2021, 1, 1),
-        schedule_interval='*/2 * * * *',
+        start_date=datetime(2023, 1, 31),
+        schedule_interval='*/10 * * * *',
         dagrun_timeout=timedelta(minutes=10),
         tags=['mine', 'scheduling'],
         catchup=False    )
