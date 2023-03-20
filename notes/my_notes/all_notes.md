@@ -8,7 +8,8 @@
 
 *Portanto* : A DAG X começará a ser schedulada a partir do `start_date` e será acionada **depois** de todo `schedule_interval`  
 
-  - Porquê ao pausar e retornar o processo a DAG não executa sozinha? (TODO)
+  - Porquê ao pausar e retornar o processo a DAG não executa sozinha? 
+    R: Porquê depende do parâmetro `start_date`
 
 ## Crontab X Timedelta
 
@@ -222,7 +223,6 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
 
 - Dependencies (TODO)
 
-
   - **Depends on past** 
   - **Wait for downstream** 
 
@@ -269,19 +269,101 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
 
 
 - Sensores
+  referência : https://docs.astronomer.io/learn/what-is-a-sensor
 
   Define-se como um operador que espera uma condição ser verdadeira para depois mover para a próxima tarefa
 
   - Exemplos : FileSensor, DateTimeSensor, SqlSensor
 
+  - Para o DateTimeSensor (espera uma data específica):
+    - target_dime - Timedelta, e por ser templated
+
+  - poke_interval - O intervalo que o Airflow irá realizar a verificação se a condição é verdadeira.
+  - mode 
+    - poke every poke_interval - Irá bloquear um worker slot
+    - reschedule - Não irá bloquear um worker slot. Será reagendado. Melhor prática para otimizar recursos.
+    - timeout = 7days
+      - soft_fail = True - Para quando não atender a condição, a task irá realizar o skipp
+      - exponential_backoff=True - Irá aumentar de forma exponencial o período de espera na condição
+      - Como boa prática, deve-se sempre definir um timeout.
+
 - Timeouts
+
+  - Podem ser definidos no nível DAG, através do parâmetro dagrun_timeout;
+  - Funcionam apenas para DAGs scheduladas, ou seja, que não foram acionadas manualmente;
+  - Como boa prática, sempre devem ser definidos
 
 - Controle de falha
 
-- Formas de retry
+  - Nível de DAG
+    - on_success_callback(context) - Acionada a função quando DAG retorna status de sucesso;
+    - on_failure_callback(context) - Acionada a função quando DAG retorna status de falha. Aqui pode-se enviar notificações, interagir com o board do Jira na parte de incidentes, etc.
+    - on_retry_callback(context) - Acionada a funação quando DAG entra em período de retentativa
+    - on_sla_miss_callback - Quando a DAG ultrapassa o SLA definido
 
+  - Nível de Task
+    Pode-se usar os mesmos parâmetros do nível DAG
+
+  - Funções úteis no controle de falhas:
+    ```
+    context['exception'] irá retornar a instância da exception (AirflowTaskTimeout,AirflowSensorTimeout,etc..)
+
+    context['ti'].try_number() irá retornar o número da retentativa
+    ```
+
+  - retry_delay : timedelta(minutes=5) - Espera 5 minutos para realizar a próxima retentativa;
+  - retry_exponential_backoff - Irá esperar mais tempo a cada retentativa. Pode ser útil no consumo de uma API ou Banco de dados, devido a uma carga execessiva.
+  - max_retry_delay - Máximo de tempo que o retray_delay pode chegar.
+  - `default_task_retries` : configuração global - O parâmtro `retries`   no nível dag e task da override.
+
+  
 - SLA
+  - É utilizado para verificar se as task foram finalizadas em um certo período de tempo;  
+  - Deve ser sempre menor que o timeout, podendo servir como parâmetro a nível de DAG e task no callback : `on_sla_miss_callback`;  
+  - Está relacionado com a `execution_date` da DAG;
+  - Se não possuir um SLA para DAG, pode-se definir um SLA para última tarefa.
+
 
 - Versionamento de DAG
-
+  - Novas tarefas irão começar com `no_status`, das tarefas anteriores
+  - Para tarefas removidas, todas as anteriores não aparecerão mais
+  - Na versão 2.5.0 não há nenhuma mecanismo para realziar o versionamento, porém como boa prática pode-se adotar a anotação : `<dag_name>_0_0_1`
+  - 
 - DAGs dinâmicas
+  - Método de único arquivo:
+    - Utilizar um for loop com `globals()<dag_id>`;
+    - As Dags serão geradas sem que o Scheduler realizar o parse;
+    - Pode resultar em problemas de performance;
+    - Não será possível visualizar o código atual da DAG na UI, apenas o código gerador das DAGs dinâmicas
+  - Método de vários arquivos (TODO : Ver exemplo)
+    - Utiliza arquivos templates
+    - É mais produtivo e escalável
+    - Uma DAG por arquivo
+    - Mais performático
+    - Mais trabalhoso na implementação
+
+- Dependência entre DAGs
+  - ExternalTaskSensor
+    - Como premissa, a DAG deveŕa ter o mesmo `execution_date`
+    - Argumentos
+        - external_dag_id
+        - external_task_id
+        - execution_delta - use if the execution_times are different
+        - execution_delta_fn - for more compelx cases
+        - failed_states - a list of statuses eg. ['failed', 'skipped']
+        - alowd_states - eg. ['success']
+    - Falhará depois de 7 dias como padrão;
+    
+  - TriggerDagRunOperator
+    - Pode ser uma forma melhor de implementar dependência entre as DAGs
+    - arguments
+      - trigger_dag_id
+      - execution_date (string|timedelta) - eg. "{{ ds }}"
+      - wait_for_completion - wait for the triggered dag to finish
+          - poke_interval
+          - mode is not available!
+      - reset_dag_run
+          - if you clear the parent without this set to True, the triggered dag will raise an exception
+          - you can't trigger a dag with the same execution_date twice without this
+          - also can't backfill without this
+      - failed_states - use if you wait
