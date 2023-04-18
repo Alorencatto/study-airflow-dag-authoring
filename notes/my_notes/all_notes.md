@@ -367,3 +367,5 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
           - you can't trigger a dag with the same execution_date twice without this
           - also can't backfill without this
       - failed_states - use if you wait
+      
+**observações** XCOM não são removidas automaticamente

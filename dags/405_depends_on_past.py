@@ -94,11 +94,11 @@ def process_tasks(partner_settings):
      dagrun_timeout=timedelta(minutes=10),
      tags=['data_science', 'customer'],
      catchup=False, max_active_runs=1,
-     retries=2,
-     retry_delay=timedelta(minutes=5),
+    #  retries=2,
+    #  retry_delay=timedelta(minutes=5),
      on_success_callback=_success_callback,
      on_failure_callback=_failure_callback,
-     sla=timedelta(minutes=10)
+    #  sla=timedelta(minutes=10)
      )
 def dag_405_depends_on_past():
 
