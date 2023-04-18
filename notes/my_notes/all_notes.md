@@ -1,15 +1,23 @@
 # Estudo Astro Certification DAG Authoriting
 
 ## Parâmetros básicos de agendameto  
-- start_date : datetime -> Data na qual a tarefa começa a ser schedulada  
+- start_date : datetime -> Data na qual a tarefa começa a ser schedulada. Em suma, quando a DAG começará a ser agendadada.  
 - schedule_interval : datetime -> Intervalo entre o valor mínimo do start_date + o valor do intervalo, no qual a dag será acionada.  
 - catchup : bool -> Parâmetro que define se as dags serão acionadas de forma retroativa com base no `start_date`.
   Se `false`, será desabilitado o acionamento das dags retroativas.
+- end_date : datetime -> Data em que a DAG não será mais AGENDADA.
 
 *Portanto* : A DAG X começará a ser schedulada a partir do `start_date` e será acionada **depois** de todo `schedule_interval`  
 
   - Porquê ao pausar e retornar o processo a DAG não executa sozinha? 
     R: Porquê depende do parâmetro `start_date`
+
+**Exemplo**: Para `start_date = 2019-01-01` e `schedule_interval = @daily`, que é todos os dias a meia-noite, temos :
+
+![img.png](../media/schedule_interval_example.png)
+
+Pois a primeira execução (`first_execution`) é sempre o `start_date` + `schedule_interval`. Portanto a primeira execução
+será em 2019-01-02.
 
 ## Crontab X Timedelta
 
@@ -94,7 +102,24 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
   * Através da task instance
   ```
   ti.xcom_push(key="partner_name", value=partner_name)
-  ti.xcom_pull(key="partner_name", task_ids="extract")
+  ti.xcom_pull(key="partner_name", task_ids=["extract"])
+  ```
+  
+  * Através de return_values
+  ```commandline
+
+  def ingest() -> dict:
+    # TODO : Buisiness logic...
+  
+    return {'value1' : "teste", 'value2' : 'teste2'}
+  
+  
+  def consume(ti) -> None:
+  
+    return_value = ti.xcom_pull("return_value",task_ids="ingest") # Se passar em [], o Airflow retornará em lista.
+  
+    ...
+  
   ```
 
   * Através da taskflow api, com funções
@@ -109,12 +134,15 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
       print(partner_name)
   ```
 
-  ** Limitações
+  **Limitações**
 
   - Tamanho : As XCOMs são recomendadas para transferir dados com volumetria baixa, sendo seu limite :
     `sqlLite 2GB, Postgres 1GB, MySQL 64kB`
   
   - Podem ser observadas na interface, em Admin -> XCOMs
+
+  - Em termos de _performance_, é melhor passar apenas um objeto do que vários, visto que para cada XCOM é realizada
+    uma conexão no banco de dados.
 
 - TaskFlow API
 
@@ -220,11 +248,78 @@ As variáveis no Airflow, são definidas em um modelo chave -> valor, possuindo 
   1. Operadores : BranchPythonOperator, BranchSqlOperator, BranchDateTimeOperator, BranchDayOfWeekOperator;
   2. Nesse tipo de operador, sempre deverá ser retornando uma task_id;
   3. Para previnir o status skipped, pode-se utilizar o parâmetro trigger_rule='none_failed_or_skipped';
+  4. O operador de Branching **SEMPRE** deverá retornar uma `task_id`, que é onde Workflow irá seguir.
+
 
 - Dependencies (TODO)
+  - [t1, t2, t3] >> t5 - As tarefas t1,t2 e t3 seguirião em paralelo e depois irá acionar a t5.  
+  - [t1, t2, t3] >> [t4, t5, t6] - Será lançado um erro. Não se pode tratar dependências entre 2 listas.
+    - Cross Dependencies
+      - Maneiras de escrever relações de dependência:
+      ```commandline
+          t1 >> t4
+          t2 >> t4
+          t3 >> t4
+    
+          --------
+          [t1, t2, t3] >> t4
+    
+          --------
+          from airflow.models.baseoperator import cross_downstream
+          cross_downstream([t1, t2, t3], [t4, t5, t6])
+            
+          --------
+          from airflow.models.baseoperator import chain
+          chain(x1, [x2,x3], [x4,x5], x6) # Listas devem ter o mesmo tamanho!
+          
+      ```
+      Utilizando a função `cross_downstream`, temos que :
+      - t4 depende de t1,t2,t3;
+      - t5 depende de t1,t2,t3;
+      - t6 depende de t1,t2,t3;  
+      
+      Vale ressaltar que a função `cross_downstream` não retornada nada, portanto não se deve seguir com
+      mais dependências depois dela.
+
+      Utilizando a função `chain`, podemos criar relações um pouco mais complexas, sendo:
+      ![img.png](../media/chain-example.png)
+      - t2 depende de t1;
+      - t3 depende de t1;
+      - t4 depende de t2;
+      - t5 depende de t3;
+      - t6 depende de t4;
+      - t6 depende de t5;
+      
+      Com isso, pode-se juntar diversos padrões de relações para n casos de uso.
 
   - **Depends on past** 
+    ```commandline
+        @task.python(depends_on_past=True)    
+    ```
+    Verifica se a tarefa agendada depende do sucesso da execução de sua última Dag run. Exemplo
+    - (1 dag run)  [A fail] -> [B] -> [C]
+    - (2 dag run )  [A] -> [B] -> [C]
+    - case1: Se A depends_on_past em A => (2)[A] Não será agendada. Ficará sem status
+
+    - A tarefa vai ser excutada se a última tiver com status de `success` ou `skipped`;
+    - Sempre interessante definir timeouts nas DAGs;
+    - Para a primeira `dag run` e em backfills, esse parâmetro é ignorado;
+      Funciona tanto para tarefas agendadadas como acionadas manulamente.
+    
+
   - **Wait for downstream** 
+  ```commandline
+    @task.python(wait_for_downstream=True) 
+  ```
+  Basicamente define o seguinte : Execute essa tarefa somente se a mesma tarefa da `dag run` anterior
+  tiver tido status de `success` ou `skipped`, **assim como sua tarefa posterior** (apenas a próxima task).
+  ![img.png](../media/example-wait-for-downstream.png)
+  - (1)  [A] -> [B] -> [C]
+  - (2)  [A] -> [B] -> [C ]
+  - Se `wait_for_downstream = True`
+    - (2)[A] não será acionado se (1)[A] e (1)[B] estiver com status de `succeded` 
+  - Sempre que esse parâmetro for atribuído, o depends_on_past será True;
+
 
 - Pools
   - Define os slots de workers;

@@ -53,7 +53,7 @@ def process_b(partner_name, partner_path):
 @task.python
 def process_c(partner_name, partner_path):
     print(partner_name)
-    print(partner_path) @ task.python
+    print(partner_path)
 
 
 @task.python
@@ -83,6 +83,7 @@ def process_tasks(service_settings):
      dagrun_timeout = timedelta(minutes = 10),
      tags = ['mine', 'branching'],
      catchup = False, max_active_runs = 1)
+
 def mine_branching_1():
     start = DummyOperator(task_id = "start")
     stop = DummyOperator(task_id = "stop")
